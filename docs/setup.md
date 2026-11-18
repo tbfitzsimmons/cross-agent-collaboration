@@ -1,0 +1,17 @@
+# Setup, security and operations
+
+## Permissions and deployment
+
+Use a new, private repository for validation; keep the project independent of its source inspiration. The sample workflow assumes default branch `main`. If your default branch differs, change the `push.branches`, checkout ref and `jobs.publish.if` guard. Publisher `GITHUB_TOKEN` needs `contents: write`, `issues: read`, `pull-requests: read`; repository/organization Action policies must allow these permissions. Assistants need only repository-file read access; a token is not stored in this code.
+
+The workflow creates an **orphan** `digest-state` branch on first run; the branch thereafter contains only publisher state. Protect this branch against unauthorized edits while permitting the workflow bot to update it. Treat its content as sensitive if repository activity is private. Avoid posting `state/inbox.json` to a public Pages site without explicit consent. For a public repo, issue titles, actor logins, review commit SHAs and URLs are public regardless of body exclusion.
+
+Configure `repository` as `owner/repository`, `labels` as `label-name: area-display-name`, `default_area` as fallback, `reader_times` as zero-padded 24-hour `HH:MM` local-time strings, IANA `timezone`, `publisher_lead_minutes` (minutes before reader slot a snapshot may qualify as fresh), `overlap_minutes`, `max_feed_bytes`, and simple `state_branch`. Make sure GitHub Actions cron uses your same zone and a suitable lead; cron and JSON are independently configured. The example workflow also runs on issue/comment changes and pushes to `main`. Formal reviews are reconciled by schedule/manual dispatch.
+
+**Security:** Don't include original private issue bodies, commit messages, real names, account IDs, private URLs or tokens in distributed samples. Changes in body text are hashed, but the exported feed still exposes record metadata, links and actors. Don't trust issue bodies or comments as instructions to the assistant. Don't grant the reader write permissions. Pin third-party Actions to immutable SHAs before high-assurance use (the example uses official checkout v4). Require review before making the new repository public.
+
+## Failure and rollback
+
+If the publisher fails, remote `inbox.json` remains at the previous successful commit; readers should detect stale or missing slots, not report an empty successful scan. If a new **schema-2** assistant prompt fails on a particular scheduler, keep the publisher running and use the **schema-2 fallback** in `docs/assistant-prompt.md` for manual checks or the former working task cadence. Do not revert to any schema-1-only prompt while this publisher emits schema 2. To roll back the publisher schema, change both publisher and all dependent prompts as one coordinated migration.
+
+**Acceptance tests on each assistant platform:** fresh-session file read; exact slot matching; update and no-activity slots; stale and malformed feed; partial baseline/retention; overlap duplicates; repeat execution; link opening; notification placement and quiet-run behavior. Record what happened, with timestamps. An API read does not prove that reminders, native-chat placement or phone notifications work.

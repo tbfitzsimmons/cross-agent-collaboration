@@ -1,0 +1,59 @@
+name: Publish assistant activity digest
+on:
+  workflow_dispatch:
+  schedule:
+    # Edit these times AND config.json together. Local-time schedule support
+    # should be verified on your GitHub Actions deployment before relying on it.
+    - cron: '37 8,14 * * *'
+      timezone: America/Denver
+  issues:
+    types: [opened, edited, closed, reopened, labeled, unlabeled, assigned, unassigned, deleted, transferred]
+  issue_comment:
+    types: [created, edited, deleted]
+  push:
+    branches: [main]
+permissions:
+  contents: write
+  issues: read
+  pull-requests: read
+concurrency:
+  group: assistant-digest-publish
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Test publisher
+        run: PYTHONPATH=src python3 -P -m unittest discover -s tests -v
+      - name: Publish snapshot in separate state branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch=$(python3 -c 'import json;print(json.load(open("config.json"))["state_branch"])')
+          # Restrict the branch name to a simple safe Git reference segment.
+          [[ "$branch" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]]
+          work="$RUNNER_TEMP/digest-state"
+          if git ls-remote --exit-code --heads origin "refs/heads/$branch" >/dev/null; then
+            git fetch --no-tags origin "refs/heads/$branch"
+            git worktree add --detach "$work" FETCH_HEAD
+          else
+            git worktree add --detach "$work" HEAD
+            git -C "$work" switch --orphan "$branch"
+            git -C "$work" rm -rf --ignore-unmatch . >/dev/null
+          fi
+          python3 src/digest.py --repo "$GITHUB_REPOSITORY" --state-dir "$work/state" --config config.json
+          git -C "$work" add state/cursor.json state/inbox.json
+          if ! git -C "$work" diff --cached --quiet; then
+            git -C "$work" -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'Publish activity snapshot'
+            git -C "$work" push origin "HEAD:refs/heads/$branch"
+          fi

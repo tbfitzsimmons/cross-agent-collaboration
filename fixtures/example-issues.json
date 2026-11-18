@@ -1,0 +1,8 @@
+{
+  "issues": [
+    {"id": 101, "number": 1, "title": "Review fictional launch checklist", "body": "Synthetic content only", "state": "open", "labels": [{"name": "area:engineering"}], "assignees": [{"login": "example-reviewer"}], "updated_at": "2026-10-20T15:00:00Z", "html_url": "https://github.com/example-org/project-board/issues/1", "user": {"login": "example-author"}}
+  ],
+  "comments": [
+    {"id": 201, "body": "Fictional comment", "updated_at": "2026-10-20T16:00:00Z", "issue_url": "https://api.github.com/repos/example-org/project-board/issues/1", "html_url": "https://github.com/example-org/project-board/issues/1#issuecomment-201", "user": {"login": "example-reviewer"}}
+  ]
+}

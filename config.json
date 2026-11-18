@@ -1,0 +1,18 @@
+{
+  "repository": "",
+  "timezone": "America/Denver",
+  "reader_times": [
+    "09:00",
+    "15:00"
+  ],
+  "publisher_lead_minutes": 23,
+  "overlap_minutes": 60,
+  "labels": {
+    "area:engineering": "Engineering",
+    "area:design": "Design",
+    "area:operations": "Operations"
+  },
+  "default_area": "General",
+  "max_feed_bytes": 16000,
+  "state_branch": "digest-state"
+}
