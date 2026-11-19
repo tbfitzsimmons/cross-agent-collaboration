@@ -121,6 +121,18 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual(len(result), 2)
         self.assertNotIn('Fictional comment', json.dumps(result))
 
+    def test_missing_conflicting_and_unregistered_areas(self):
+        missing = issue(labels=[])
+        unknown = issue(labels=[{'name':'area:new'}])
+        conflicting = issue(labels=[{'name':'area:engineering'}, {'name':'area:design'}])
+        cfg = {**CONFIG, 'labels': {'area:engineering':'Engineering','area:design':'Design'}}
+        self.assertIn('missing_area', capture(REPO, cfg, mock_read([missing]))['issue:101']['area_warnings'])
+        warnings = capture(REPO, cfg, mock_read([unknown]))['issue:101']['area_warnings']
+        self.assertIn('unregistered_area', warnings)
+        self.assertIn('conflicting_areas', capture(REPO, cfg, mock_read([conflicting]))['issue:101']['area_warnings'])
+        registered = {**cfg, 'labels': {**cfg['labels'], 'area:new': 'New'}}
+        self.assertNotIn('area_warnings', capture(REPO, registered, mock_read([unknown]))['issue:101'])
+
     def test_repository_mismatch(self):
         with tempfile.TemporaryDirectory() as temp:
             with self.assertRaises(ValueError):
