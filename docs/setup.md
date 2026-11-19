@@ -2,6 +2,8 @@
 
 ## Permissions and deployment
 
+The source project disables publishing by default. Set the repository Actions variable `DIGEST_PUBLISH_ENABLED=true` only in a deployment after privacy review and configuring its workflow permissions.
+
 Use a new, private repository for validation; keep the project independent of its source inspiration. The sample workflow assumes default branch `main`. If your default branch differs, change the `push.branches`, checkout ref and `jobs.publish.if` guard. Publisher `GITHUB_TOKEN` needs `contents: write`, `issues: read`, `pull-requests: read`; repository/organization Action policies must allow these permissions. Assistants need only repository-file read access; a token is not stored in this code.
 
 The workflow creates an **orphan** `digest-state` branch on first run; the branch thereafter contains only publisher state. Protect this branch against unauthorized edits while permitting the workflow bot to update it. Treat its content as sensitive if repository activity is private. Avoid posting `state/inbox.json` to a public Pages site without explicit consent. For a public repo, issue titles, actor logins, review commit SHAs and URLs are public regardless of body exclusion.
