@@ -1,5 +1,5 @@
 {
-  "repository": "",
+  "repository": "example-org/project-board",
   "timezone": "America/Denver",
   "reader_times": [
     "09:00",
@@ -14,5 +14,10 @@
   },
   "default_area": "General",
   "max_feed_bytes": 16000,
-  "state_branch": "digest-state"
+  "state_branch": "digest-state",
+  "feed_schema": 2,
+  "cursor_max_events": 2000,
+  "revision_files": {
+    "reader_prompt": "docs/reader-operational.md"
+  }
 }
