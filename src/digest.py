@@ -50,6 +50,14 @@ def capture(repo, cfg, read=api_pages, read_one=api_one):
     def add(kind, row, issue, detail, extra=None):
         labels = sorted(x['name'] for x in issue.get('labels', []))
         matches = sorted({areas[x] for x in labels if x in areas})
+        unknown = sorted(x for x in labels if x.startswith(cfg.get('area_label_prefix', 'area:')) and x not in areas)
+        warnings = []
+        if unknown:
+            warnings.append('unregistered_area')
+        if len(matches) == 0:
+            warnings.append('missing_area')
+        elif len(matches) > 1:
+            warnings.append('conflicting_areas')
         record = {
             'key': f'{kind}:{row["id"]}', 'kind': kind, 'topic': issue['number'],
             'title': issue['title'], 'area': matches[0] if len(matches) == 1 else cfg['default_area'],
@@ -58,6 +66,8 @@ def capture(repo, cfg, read=api_pages, read_one=api_one):
             'source_time': row.get('updated_at') or row.get('submitted_at') or row.get('created_at'),
             'fingerprint': fingerprint(kind, detail),
         }
+        if warnings:
+            record['area_warnings'] = warnings
         if extra:
             record.update(extra)
         records[record['key']] = record
