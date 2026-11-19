@@ -12,6 +12,11 @@ on:
     types: [created, edited, deleted]
   push:
     branches: [main]
+  # Completion of untrusted PR CI is only a notification. Do not run PR code
+  # or read artifacts in this privileged workflow.
+  workflow_run:
+    workflows: [Contributor CI]
+    types: [completed]
 permissions:
   contents: write
   issues: read
@@ -21,13 +26,17 @@ concurrency:
   cancel-in-progress: false
 jobs:
   publish:
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name != 'workflow_run' ||
+       (github.event.workflow_run.event == 'pull_request' &&
+        github.event.workflow_run.conclusion == 'success'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.event.repository.default_branch }}
           persist-credentials: true
       - name: Test publisher
         run: PYTHONPATH=src python3 -P -m unittest discover -s tests -v
@@ -41,14 +50,23 @@ jobs:
           # Restrict the branch name to a simple safe Git reference segment.
           [[ "$branch" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]]
           work="$RUNNER_TEMP/digest-state"
-          if git ls-remote --exit-code --heads origin "refs/heads/$branch" >/dev/null; then
-            git fetch --no-tags origin "refs/heads/$branch"
-            git worktree add --detach "$work" FETCH_HEAD
-          else
-            git worktree add --detach "$work" HEAD
-            git -C "$work" switch --orphan "$branch"
-            git -C "$work" rm -rf --ignore-unmatch . >/dev/null
-          fi
+          lookup=0
+          git ls-remote --exit-code --heads origin "refs/heads/$branch" >/dev/null || lookup=$?
+          case "$lookup" in
+            0)
+              git fetch --no-tags origin "refs/heads/$branch"
+              git worktree add --detach "$work" FETCH_HEAD
+              ;;
+            2)
+              git worktree add --detach "$work" HEAD
+              git -C "$work" switch --orphan "$branch"
+              git -C "$work" rm -rf --ignore-unmatch . >/dev/null
+              ;;
+            *)
+              echo "State branch lookup failed (exit $lookup); preserving remote state" >&2
+              exit "$lookup"
+              ;;
+          esac
           python3 src/digest.py --repo "$GITHUB_REPOSITORY" --state-dir "$work/state" --config config.json
           git -C "$work" add state/cursor.json state/inbox.json
           if ! git -C "$work" diff --cached --quiet; then
