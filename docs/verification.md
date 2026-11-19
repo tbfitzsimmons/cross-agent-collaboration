@@ -1,23 +1,17 @@
-# Verification and evidence matrix (release candidate)
+# Verification matrix (this export only)
 
-| Property | Evidence status |
+| Property | Status and evidence boundary |
 | --- | --- |
-| API snapshot modeling, dedup quiet repeat, comment edit and closure | Local synthetic unit tests pass |
-| Reassignment included in issue fingerprint | Local regression test passes |
-| PR approval metadata ties to reviewed commit SHA | Local synthetic unit test passes |
-| Stateless windows, lead cutoff and DST | Local synthetic unit tests pass |
-| Retention clipping and partial coverage flags | Local synthetic unit tests pass |
-| Failed API read preserves existing files | Local synthetic unit test passes |
-| New Git history independent of source | Local `git init` and audit; no source `.git` copied |
-| Live `gh` permissions, pagination on a target repo, Actions state branch and push | **Not yet verified** in a new repository |
-| GitHub local-time scheduled run actually fires at intended time | **Not yet verified** in a new repository |
-| Read-only connector sees fresh schema-2 snapshot on each AI platform | **Not yet verified** |
-| Scheduler fresh-session delivery, links, quiet notifications, missed runs and repeat behavior | **Not yet verified per platform** |
+| Publisher, reader, fingerprint migration, topic compaction, exact links, UTF-8 budget and synthetic regression fixtures | Local automated tests; see draft PR suite |
+| Repository and initial schema-2 state branch | GitHub connector read verified in prior deployment; not proof of recurring schedule |
+| CI on untrusted PR code | Pending hosted check observation |
+| Trusted-main publisher following PR CI | Pending merge and actual workflow-run observation |
+| Initial state bootstrap failure handling | Local static workflow test; failure-mode hosted observation pending |
+| Feed fullness/retention pressure | Tested synthetically; another installation's 98–99% result is not evidence about this export |
+| Timer: actual `event=schedule`, remote state commit across two recovery periods | Unverified |
+| Native AI task saved configuration | Unverified per account |
+| Independent scheduled reader sessions, exact links, quiet/partial/stale output | Unverified per platform |
+| Native destination, phone delivery, measured token usage | Unverified |
+| Privacy audit and public release | Needs final audit, license and visibility decision |
 
-The motivating private implementation previously exercised synthetic comment/review/edit scenarios and a quiet state-branch baseline. That evidence does not certify this independent export or other vendors' schedulers. All acceptance on this project must be repeated in the new repository.
-
-A scheduled occurrence is not proof of job execution; a GitHub run is not proof of a successful reader notification. The recipient must observe actual task output and its destination before claiming end-to-end delivery.
-
-## Current neutral-name RC
-
-Local tests re-executed after renaming: 9 passed. The private-pilot checklist is in `docs/private-pilot.md`; no live independent repository was created or exercised by this local build.
+No cross-account task change or repository visibility change is authorized by these draft PRs. Source deployment results, if cited, remain explicitly labeled as **external evidence**. See [schema migration and operational limits](schema-migration.md).

@@ -2,7 +2,7 @@
 
 A provider-neutral starting point for collaboration between independent AI assistants. This release candidate implements the GitHub activity-feed layer—not shared agent memory, conflict-resolution, or autonomous cross-agent execution. A small, assistant-neutral GitHub activity feed. A GitHub Actions publisher reconciles issues, comments, PRs, review comments and formal reviews into a bounded JSON snapshot on a separate state branch. Any assistant with **read access** to that repository can check the same window without relying on prior chat memory.
 
-**Status:** local release candidate; not published or deployed. Python 3.11+, GitHub CLI (`gh`) on Actions, and GitHub read/write permissions for the publisher. No extra Python dependencies.
+**Status:** private test repository; proposed improvements are in draft PRs. Hosted release and cross-platform delivery are not yet verified. Python 3.11+, GitHub CLI (`gh`) on Actions, and GitHub read/write permissions for the publisher. No extra Python dependencies.
 
 ## Quick start
 
@@ -32,8 +32,12 @@ See [setup and security notes](docs/setup.md) and [verification matrix](docs/ver
 
 ## License
 
-**Pending owner approval.** Proposed: MIT (see `LICENSE-PROPOSED.txt`). No public release or final licensing is authorized by this release candidate.
+**Proposed only:** MIT (see `LICENSE-PROPOSED.txt`). This draft does not change repository visibility, issue publication policy, licensing, or private task configuration.
 
 ## Private pilot gate
 
-The source package has been tested locally, but **a private GitHub deployment is still required**. Do not publicize the code or mark multi-agent collaboration as verified solely because the GitHub Actions publisher succeeds. See `docs/private-pilot.md` for the two-run acceptance checklist and the evidence log.
+A private repository and initial state-branch baseline exist, but independent hosted PR CI, repeated `event=schedule` publication, and downstream agent delivery are **not yet verified**. Do not publicize the code or mark multi-agent collaboration as verified solely because a publisher succeeds. See `docs/private-pilot.md` for the two-run acceptance checklist and the evidence log.
+
+## Compatibility and migration
+
+The publisher stays on schema **2** by default. Optional schema-3 topic compaction and canonical instruction revisions require the ordered, reader-first gate in [schema migration](docs/schema-migration.md). The reference pure reader in `src/reader.py` accepts schemas 2 and 3; it is not a deployed assistant connector or scheduler.
