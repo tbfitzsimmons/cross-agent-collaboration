@@ -25,6 +25,7 @@ class WorkflowSafetyTests(unittest.TestCase):
         self.assertIn("github.event.workflow_run.event == 'pull_request'", text)
         self.assertIn("github.event.workflow_run.conclusion == 'success'", text)
         self.assertIn("github.ref == 'refs/heads/main'", text)
+        self.assertIn("vars.DIGEST_PUBLISH_ENABLED == 'true'", text)
         self.assertIn('ref: ${{ github.event.repository.default_branch }}', text)
         self.assertNotIn('github.event.workflow_run.head_sha', text)
         self.assertNotIn('download-artifact', text)
