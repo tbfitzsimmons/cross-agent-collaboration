@@ -18,6 +18,7 @@
   "feed_schema": 2,
   "cursor_max_events": 2000,
   "revision_files": {
-    "reader_prompt": "docs/reader-operational.md"
+    "reader_prompt": "docs/reader-operational.md",
+    "collaboration_protocol": "docs/collaboration-protocol.md"
   }
 }
