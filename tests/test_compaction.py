@@ -1,7 +1,9 @@
 import unittest
+import json
 from pathlib import Path
+import tempfile
 from unittest.mock import Mock
-from digest import compact_updates, feed_for, encoded, reconcile, capture, instruction_revisions, trim_cursor
+from digest import compact_updates, feed_for, encoded, reconcile, capture, instruction_revisions, trim_cursor, publish
 from reader import read_window
 from test_digest import CONFIG, REPO, T0, T1, issue, mock_read
 from datetime import datetime,timezone
@@ -67,6 +69,36 @@ class CompactionTests(unittest.TestCase):
         current=capture(REPO,CONFIG,mock_read([issue(locked=True)]))
         changed=reconcile(baseline,current,T1)
         self.assertEqual(len(changed['updates']),1)
+
+    def test_schema3_cursor_roundtrip_preserves_full_record_links(self):
+        comments = []
+        c = {'id': 501, 'body': 'Fictional edit', 'issue_url':'https://api.github.com/issues/1',
+             'html_url':f'https://github.com/{REPO}/issues/1#issuecomment-501','updated_at':T1}
+        cfg = {**self.cfg, 'revision_files':{}}
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            publish(REPO, folder, cfg, mock_read([issue()], comments), now=datetime.fromisoformat(T0))
+            comments.append(c)
+            first=publish(REPO, folder, cfg, mock_read([issue()], comments), now=datetime.fromisoformat(T1))
+            full=json.loads((folder/'cursor.json').read_text())
+            published=json.loads((folder/'inbox.json').read_text())
+            self.assertEqual(first, published)
+            self.assertEqual(full['updates'][0]['url'], c['html_url'])
+            self.assertEqual(full['updates'][0]['title'], issue()['title'])
+            self.assertEqual(published['schema'],3)
+            self.assertTrue(published['updates'][0]['url'].endswith('#issuecomment-501'))
+            quiet=publish(REPO, folder, cfg, mock_read([issue()], comments), now=datetime.fromisoformat(T1))
+            self.assertEqual(quiet['sequence'], first['sequence'])
+
+    def test_revision_map_multiple_independent_blobs(self):
+        def runner(cmd, text):
+            path=cmd[-1]
+            sha={'docs/reader-operational.md':'abc111','docs/collaboration-protocol.md':'def222'}[path]
+            return f'100644 blob {sha}\t{path}\n'
+        revisions=instruction_revisions({'revision_files':{
+            'reader_prompt':'docs/reader-operational.md',
+            'collaboration_protocol':'docs/collaboration-protocol.md'}},runner=runner)
+        self.assertEqual(revisions,{'reader_prompt':'abc111','collaboration_protocol':'def222'})
 
     def test_cursor_trim_explicit_watermark(self):
         events=[{**self.comment,'sequence':n,'observed_at':T1} for n in range(1,9)]
