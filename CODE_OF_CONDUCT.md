@@ -1,0 +1,3 @@
+# Code of conduct
+
+Be respectful, constructive, and precise when discussing design tradeoffs. Assume good faith, criticize ideas rather than people, and avoid harassment, discrimination, threats, doxxing or sharing personal information. Maintainers may moderate issues, discussions and pull requests to protect participants and the project. Report concerns privately through the security-reporting pathway rather than posting sensitive material in public.
