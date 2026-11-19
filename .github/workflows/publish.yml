@@ -75,3 +75,8 @@ jobs:
               commit -m 'Publish activity snapshot'
             git -C "$work" push origin "HEAD:refs/heads/$branch"
           fi
+
+          if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+            bytes=$(wc -c < "$work/state/inbox.json")
+            echo "Digest snapshot bytes: $bytes (configured byte budget in config.json). Snapshot start is not publication or delivery." >> "$GITHUB_STEP_SUMMARY"
+          fi
