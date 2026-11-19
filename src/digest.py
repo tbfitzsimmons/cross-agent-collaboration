@@ -65,11 +65,13 @@ def capture(repo, cfg, read=api_pages, read_one=api_one):
             'url': row['html_url'],
             'source_time': row.get('updated_at') or row.get('submitted_at') or row.get('created_at'),
             'fingerprint': fingerprint(kind, detail),
+            'fingerprints': {'1': fingerprint(kind, detail),
+                             '2': fingerprint(kind, detail, extra.get('lock_detail') if extra else None)},
         }
         if warnings:
             record['area_warnings'] = warnings
         if extra:
-            record.update(extra)
+            record.update({k: v for k, v in extra.items() if k != 'lock_detail'})
         records[record['key']] = record
 
     for issue in issues:
@@ -79,7 +81,7 @@ def capture(repo, cfg, read=api_pages, read_one=api_one):
         pull = 'pull_request' in issue
         detail = [issue.get('title'), issue.get('body'), issue.get('state'), labels,
                   sorted(a['login'] for a in issue.get('assignees', [])), issue.get('milestone', {}).get('number') if issue.get('milestone') else None]
-        extra = {'state': issue.get('state')}
+        extra = {'state': issue.get('state'), 'lock_detail': [issue.get('locked'), issue.get('active_lock_reason')]}
         if pull:
             p = read_one(repo, f'pulls/{num}')
             detail += [p['head']['sha'], p.get('merged_at'), p.get('draft'), p.get('base', {}).get('ref')]
@@ -99,6 +101,18 @@ def capture(repo, cfg, read=api_pages, read_one=api_one):
     return records
 
 
+def same_fingerprint(old, row):
+    """Compare newest jointly supported fingerprint version, for safe upgrades.
+
+    Legacy cursors only carry `fingerprint` (v1); re-baselining new v2
+    fields must not fabricate edits on all existing topics.
+    """
+    old_versions = dict(old.get('fingerprints') or {'1': old['fingerprint']})
+    new_versions = dict(row.get('fingerprints') or {'1': row['fingerprint']})
+    common = sorted(set(old_versions) & set(new_versions), key=int)
+    return bool(common) and old_versions[common[-1]] == new_versions[common[-1]]
+
+
 def reconcile(previous, current, checked_at):
     if not previous:
         return {'checked_at': checked_at, 'coverage_started_at': checked_at,
@@ -108,7 +122,7 @@ def reconcile(previous, current, checked_at):
     before = previous['records']
     changes = []
     for key, row in current.items():
-        if key not in before or before[key]['fingerprint'] != row['fingerprint']:
+        if key not in before or not same_fingerprint(before[key], row):
             changes.append((row, 'new' if key not in before else 'updated'))
     for key in before.keys() - current.keys():
         changes.append((before[key], 'no_longer_visible'))
@@ -116,7 +130,7 @@ def reconcile(previous, current, checked_at):
     updates = list(previous['updates'])
     for row, change in sorted(changes, key=lambda item: (item[0].get('source_time') or '', item[0]['key'])):
         sequence += 1
-        updates.append({**{k: v for k, v in row.items() if k != 'fingerprint'},
+        updates.append({**{k: v for k, v in row.items() if k not in ('fingerprint', 'fingerprints')},
                         'sequence': sequence, 'change': change, 'observed_at': checked_at})
     return {'checked_at': checked_at, 'coverage_started_at': previous['coverage_started_at'],
             'dropped_through_at': previous.get('dropped_through_at'),
@@ -160,17 +174,65 @@ def windows(state, retained, dropped, cfg):
     return result
 
 
-def feed_for(repository, state, cfg):
+def compact_updates(items, records):
+    """Schema-3 presentation: title/area/base URL stored once per topic.
+
+    Exact source links and historical title/area differences remain on entries.
+    The source cursor retains FULL entries, not these compact projections.
+    """
+    topics = {}
+    for item in items:
+        topic = item.get('topic')
+        if topic is None:
+            continue
+        key = str(topic)
+        if key in topics:
+            continue
+        parent = next((v for v in records.values()
+                       if v.get('topic') == topic and v.get('kind') in ('issue', 'pull_request')),
+                      item)
+        entry = {'title': parent.get('title'), 'area': parent.get('area'),
+                 'url': parent.get('url')}
+        if parent.get('area_warnings'):
+            entry['area_warnings'] = parent['area_warnings']
+        topics[key] = {k: v for k, v in entry.items() if v is not None}
+    compact = []
+    for item in items:
+        out = {k: v for k, v in item.items() if v is not None}
+        canonical = topics.get(str(item.get('topic')), {})
+        for key in ('title', 'area', 'url', 'area_warnings'):
+            if key == 'url' and item.get('kind') in ('comment', 'review', 'inline_comment'):
+                continue  # Keep exact permalinks regardless of topic URL.
+            actual = item.get(key, [] if key == 'area_warnings' else None)
+            expected = canonical.get(key, [] if key == 'area_warnings' else None)
+            if actual == expected:
+                out.pop(key, None)
+            elif key == 'area_warnings':
+                out[key] = actual  # Explicit [] overrides a newer routing warning.
+        compact.append(out)
+    return compact, topics
+
+
+def feed_for(repository, state, cfg, revisions=None):
     updates = state['updates']
+    schema = cfg.get('feed_schema', 2)
+    if schema not in (2, 3):
+        raise ValueError('Unsupported publication schema')
 
     def candidate(first):
-        remaining = updates[first:]
+        full = updates[first:]
         dropped = updates[first - 1]['observed_at'] if first else state.get('dropped_through_at')
-        return {'schema': SCHEMA, 'repository': repository,
-                'checked_at': state['checked_at'], 'sequence': state['sequence'],
-                'coverage_started_at': state['coverage_started_at'], 'dropped_through_at': dropped,
-                'oldest_sequence': remaining[0]['sequence'] if remaining else None,
-                'windows': windows(state, remaining, dropped, cfg), 'updates': remaining}
+        retained, topics = compact_updates(full, state.get('records', {})) if schema == 3 else (full, {})
+        result = {'schema': schema, 'repository': repository,
+                  'checked_at': state['checked_at'], 'sequence': state['sequence'],
+                  'coverage_started_at': state['coverage_started_at'], 'dropped_through_at': dropped,
+                  'oldest_sequence': retained[0]['sequence'] if retained else None,
+                  'windows': windows(state, retained, dropped, cfg), 'updates': retained}
+        if schema == 3:
+            result['topics'] = topics
+        if revisions:
+            result['revisions'] = revisions
+        return result
 
     answer = candidate(len(updates))
     if len(encoded(answer)) > cfg['max_feed_bytes']:
@@ -183,6 +245,35 @@ def feed_for(repository, state, cfg):
     return answer
 
 
+def instruction_revisions(cfg, tree='HEAD', runner=subprocess.check_output):
+    """Hash ONLY canonical files, never mixed runbooks or native task settings."""
+    revisions = {}
+    for key, path in cfg.get('revision_files', {}).items():
+        if not path or path.startswith('/') or '..' in Path(path).parts:
+            raise ValueError('Revision paths must be relative to the repository')
+        listing = runner(['git', 'ls-tree', tree, '--', path], text=True).strip()
+        if not listing or len(listing.splitlines()) != 1:
+            raise ValueError('Missing or ambiguous canonical revision path: ' + path)
+        parts = listing.split('\t', 1)[0].split()
+        if len(parts) != 3 or parts[1] != 'blob':
+            raise ValueError('Expected tracked canonical file: ' + path)
+        revisions[key] = parts[2]
+    return revisions
+
+
+def trim_cursor(state, cfg):
+    """Bound full-version cursor storage separately from the compact feed."""
+    limit = cfg.get('cursor_max_events', 2000)
+    if not isinstance(limit, int) or limit < 1:
+        raise ValueError('Invalid cursor retention count')
+    updates = state['updates']
+    if len(updates) > limit:
+        removed = updates[:-limit]
+        state['dropped_through_at'] = removed[-1]['observed_at']
+        state['updates'] = updates[-limit:]
+    return state
+
+
 def configuration(path):
     cfg = json.loads(Path(path).read_text(encoding='utf-8'))
     ZoneInfo(cfg['timezone'])
@@ -193,6 +284,10 @@ def configuration(path):
         raise ValueError('Reader slots must be nonempty and unique')
     if not 0 <= cfg['overlap_minutes'] <= 1440 or not 0 <= cfg['publisher_lead_minutes'] <= 1440:
         raise ValueError('Invalid interval')
+    if cfg.get('feed_schema', 2) not in (2, 3):
+        raise ValueError('Unsupported feed schema')
+    if cfg.get('cursor_max_events', 2000) < 1:
+        raise ValueError('Invalid cursor retention count')
     if cfg['max_feed_bytes'] < 1024:
         raise ValueError('Max feed bytes too small')
     return cfg
@@ -206,9 +301,10 @@ def publish(repo, directory, cfg, read=api_pages, read_one=api_one, now=None):
     checked = (now or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
     current = capture(repo, cfg, read, read_one)
     state = reconcile(prior, current, checked)
-    feed = feed_for(repo, state, cfg)
-    state['updates'] = feed['updates']
-    state['dropped_through_at'] = feed['dropped_through_at']
+    trim_cursor(state, cfg)
+    feed = feed_for(repo, state, cfg, instruction_revisions(cfg))
+    # The cursor retains complete event versions; only the published projection is
+    # compact and byte-bounded. Never store schema-3 projections as cursor history.
     directory.mkdir(parents=True, exist_ok=True)
     # Write only after *all* API calls and validation have succeeded.
     for name, obj in [('cursor.json', state), ('inbox.json', feed)]:
