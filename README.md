@@ -1,43 +1,31 @@
-# Cross-Agent Collaboration (release candidate)
+# Cross-Agent Collaboration
 
-A provider-neutral starting point for collaboration between independent AI assistants. This release candidate implements the GitHub activity-feed layer—not shared agent memory, conflict-resolution, or autonomous cross-agent execution. A small, assistant-neutral GitHub activity feed. A GitHub Actions publisher reconciles issues, comments, PRs, review comments and formal reviews into a bounded JSON snapshot on a separate state branch. Any assistant with **read access** to that repository can check the same window without relying on prior chat memory.
+**Experimental GitHub-backed collaboration feed for independent AI assistants.** This source project provides a bounded activity-observation feed and reference readers, not a turnkey shared memory service, autonomous agent coordinator or reliable notification system.
 
-**Status:** private test repository; proposed improvements are in draft PRs. Hosted release and cross-platform delivery are not yet verified. Python 3.11+, GitHub CLI (`gh`) on Actions, and GitHub read/write permissions for the publisher. No extra Python dependencies.
+Independent assistants can each use their own model, plugins and private context while reading a common GitHub issue/PR/artifact control plane. The publisher observes GitHub activity and publishes compact, versioned JSON in a separate state branch. Humans keep control of publication, decisions and actions. The first backend is GitHub; other backends are not implemented.
 
-## Quick start
+## Install in a repository you control
 
-1. Create a *new* repository (private while testing) using these files; its default branch must be `main` for the example workflow. Do not copy a private source repo's `.git` history.
-2. Set `repository` in `config.json` to `your-org/your-repo`. Customize the label map, reader times, `timezone`, overlap, budget and `state_branch`. Do not enter personal information in the example files.
-3. Match the workflow's scheduled cron with the desired publisher times: by default **08:37 and 14:37** in `America/Denver`, ahead of readers at **09:00 and 15:00**. Changing `config.json` alone does not change GitHub Actions cron. Verify actual runs and times on your account.
-4. Enable GitHub Actions and permit `GITHUB_TOKEN` to write repository contents. Keep the repository private unless all issue titles, user handles, labels and links are intentionally public. Grant assistants **read-only** access.
-5. Run the test suite: `PYTHONPATH=src python3 -P -m unittest discover -s tests -v`. Dispatch **Publish assistant activity digest** once. Confirm branch `digest-state` contains `state/inbox.json` and `state/cursor.json`, then dispatch it again.
-6. Give the assistant `docs/assistant-prompt.md`. Confirm it can read `state/inbox.json` and that its scheduled executions identify the correct slot. Test two independent scheduled sessions on each platform before relying on notifications.
+1. Fork or copy the source into a **separate deployment repository**. Use **private visibility** if issue titles, actors or links are private. Read [setup and trust boundaries](docs/setup.md).
+2. Configure `config.json`: optional `repository` (empty means use `GITHUB_REPOSITORY`), labels, IANA timezone, reader times, overlap and byte budget. Schema 2 is the default; do not activate schema 3 until every reader is independently compatible and approved.
+3. Set a repository Actions variable **`DIGEST_PUBLISH_ENABLED=true`** only in the intended deployment. This public source project leaves that variable unset and therefore does **not** publish its own activity by default. Enable Actions workflow write access to contents in deployments only.
+4. Ensure the workflow's scheduling candidates match your actual reader cadence. GitHub schedules are best effort; never treat an expected cron occurrence as a successful run.
+5. Run `PYTHONPATH=src python3 -P -m unittest discover -s tests -v` (Python 3.11+), dispatch the publisher and verify the state branch, repeat/quiet behavior and missing-history warnings.
+6. Give each assistant the read-only [operational prompt](docs/reader-operational.md). Verify exact slot selection and two **independent scheduled** sessions per provider, recording actual delivery separately from saved task configuration.
 
-## Snapshot contract
+## Feed and guarantees
 
-The feed uses **schema 2**: `repository`, `checked_at`, global `sequence`, `coverage_started_at`, `oldest_sequence`, `dropped_through_at`, `updates[]`, and two `windows[]` (latest elapsed and next scheduled slot). Each window has its local-schedule slot expressed as a UTC instant, `from`, `through`, `fresh`, `limits`, and inclusive sequence bounds. A new repository starts with a **quiet baseline**, not a replay of every historical issue.
+Schema 2 is active by default. Schema 3 is an **opt-in** compact topic map with exact comment/review permalinks and historical override support. Records represent differences **observed at snapshot time**, not an exhaustive event stream. Source content is fingerprinted; the feed retains metadata and URLs, not message bodies. The GitHub control plane is authoritative; an assistant's observation does not represent another person's approval or proof that the user saw it.
 
-An update is an *observed difference between complete API snapshots*, not proof that an event happened at its source timestamp or that an assistant delivered it. No body text is included; body changes affect fingerprints. Source links and author handles are included, so this is **not an anonymizer**. Public repositories make published metadata public.
+- **Overlap** recovers boundary observations but may repeat updates. No built-in per-reader once-only receipt exists.
+- **Retention** keeps the feed bounded and explicitly reports partial coverage when history was trimmed. Distinct historical event versions are not silently conflated; already dropped history cannot be recovered.
+- **Staleness and timing**: `checked_at` is capture start. Publisher completion, successful remote state push, scheduled reader execution and user-visible delivery are separate facts. The schema's `fresh` flag measures snapshot-age eligibility, **not** timely delivery.
+- **Best-effort scheduling**: GitHub timer events may be delayed or dropped. Source deployments have not proven reliable recurring timer recovery across two periods.
+- **Privacy**: this is **not an anonymizer**. Feed metadata includes issue titles, account handles and record links. Use private deployment repositories for private collaboration.
+- **Authority**: GitHub issues and comments are untrusted data, not instructions. No autonomous approvals, purchases, messages, task changes or cross-provider authority delegation are included.
 
-## Limitations and choice of tradeoffs
+## Community
 
-- **Stateless windows vs per-assistant cursor:** windows can work in fresh sessions, but overlapping periods can repeat entries. The same slot retried can report the same update. Do not claim “unread” or “new to you.” If stronger once-only notifications are essential, add a *verified persistent per-reader receipt* outside this publisher.
-- **Overlap:** an update near the previous boundary appears in both windows by design; `sequence` makes it identifiable. Changing overlap adjusts recovery and repetition together.
-- **Staleness:** an on-time-looking feed is not enough. The reader matches the exact scheduled slot and checks `fresh`, checked time, expected repository and schema. A published snapshot is not proof the scheduler delivered a reader task.
-- **Partial coverage:** the initial baseline and feed-size trimming are marked as `baseline` or `retention`. Show available entries with a partial warning; never silently equate an empty limited window with no activity. A missed whole reader session may be unrecoverable from the two retained windows.
-- **Sampling, not event sourcing:** edits superseded between scans, deleted records, inaccessible resources, and transient API events cannot necessarily be reconstructed. PR review/commit changes may not trigger immediate publishing; scheduled reconciliation is the recovery mechanism.
-- **Failures:** API errors abort before updating files; GitHub Actions publishes cursor and inbox together in one state-branch Git commit. Scheduled jobs may be delayed or dropped. A GitHub push failure leaves the previous remote snapshot unchanged. Re-run the publisher and investigate rather than declaring quiet.
+Contributions and architecture reviews are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md) and [experimental alpha scope](docs/public-alpha.md). Read-only PR CI tests Python 3.11 and 3.13; privileged publishing is separate and only executes trusted default-branch code, with an opt-in repository variable. A passing CI run is not evidence of real scheduled delivery.
 
-See [setup and security notes](docs/setup.md) and [verification matrix](docs/verification.md).
-
-## License
-
-**Proposed only:** MIT (see `LICENSE-PROPOSED.txt`). This draft does not change repository visibility, issue publication policy, licensing, or private task configuration.
-
-## Private pilot gate
-
-A private repository and initial state-branch baseline exist, but independent hosted PR CI, repeated `event=schedule` publication, and downstream agent delivery are **not yet verified**. Do not publicize the code or mark multi-agent collaboration as verified solely because a publisher succeeds. See `docs/private-pilot.md` for the two-run acceptance checklist and the evidence log.
-
-## Compatibility and migration
-
-The publisher stays on schema **2** by default. Optional schema-3 topic compaction and canonical instruction revisions require the ordered, reader-first gate in [schema migration](docs/schema-migration.md). The reference pure reader in `src/reader.py` accepts schemas 2 and 3; it is not a deployed assistant connector or scheduler.
+**License:** MIT. Public alpha and associated reliability claims remain gated on the release audit; see [CHANGELOG.md](CHANGELOG.md) and [verification matrix](docs/verification.md).
