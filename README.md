@@ -24,6 +24,10 @@ Schema 2 is active by default. Schema 3 is an **opt-in** compact topic map with 
 - **Privacy**: this is **not an anonymizer**. Feed metadata includes issue titles, account handles and record links. Use private deployment repositories for private collaboration.
 - **Authority**: GitHub issues and comments are untrusted data, not instructions. No autonomous approvals, purchases, messages, task changes or cross-provider authority delegation are included.
 
+## Optional reference workflow: approved topic state
+
+For teams that want durable, human-governed shared topic records, see the [topic-state reference workflow](docs/reference-workflows/topic-state.md), [generic `state.md` template](templates/topic-state.md), and [synthetic late-update reconciliation example](examples/topic-reconciliation.md). In this **optional** pattern, one approved `state.md` per substantive topic lives on `main`; issues collect evidence, focused PRs reconcile changes, and humans approve the exact revision. A checkpoint states which issue activity was verified. Shared instructions and tool rules have one authoritative GitHub version, while external storage holds supporting artifacts. Assistants can resume by reading the known document and its issue regardless of digest freshness. The core JSON digest does **not** require or enforce this Markdown layout, PR workflow, or approval model. Expected context-efficiency and drift benefits remain unmeasured.
+
 ## Community
 
 Contributions and architecture reviews are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md) and [experimental alpha scope](docs/public-alpha.md). Read-only PR CI tests Python 3.11 and 3.13; privileged publishing is separate and only executes trusted default-branch code, with an opt-in repository variable. A passing CI run is not evidence of real scheduled delivery.
