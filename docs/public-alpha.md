@@ -1,20 +1,29 @@
-# Experimental public alpha: scope and publication gates
+# Public alpha: positioning, scope and publication gates
 
-This repository is a **source project**, not a live multi-tenant service. A user deploys a copy in a repository they control; private deployments should use private repositories and read-only assistant integrations.
+## One-sentence description
 
-## Release gate
+**Selective, human-governed collaboration between independently owned AI environments using GitHub as a shared versioned boundary.**
 
-- Approve the complete public Git history, all reachable branches, issues, review comments, GitHub Actions logs and artifacts; changing visibility exposes more than current `main`.
-- Remove the pilot-only `digest-state` branch **and verify remaining history/log exposure**. Deleting a branch is not proof that Git objects or workflow logs have been erased. Document remaining public artifacts and obtain explicit acceptance of any non-sensitive identifiers.
-- Keep the original private implementation independent; do not import its logs, workflow artifacts, account details or history.
-- Confirm the final MIT license/copyright, contributor and security instructions, branch rules, PR CI isolation and the source-only publisher-disabled default.
-- Run tests on the exact release commit. Audit tracked content and history for secrets, private URLs, household details, account IDs and non-synthetic sample data.
-- Mark v0.1.0-alpha as a **pre-release** only after repository visibility is changed and source review is complete. Do not imply scheduler reliability or autonomous decision authority.
+This is a reference architecture and an experimental optional GitHub activity digest. It does not merge personal assistant accounts, private connectors or memories. It does not implement A2A or replace MCP, agent workspaces or native AI subscriptions.
 
-## Verified versus pending
+## What is included
 
-Synthetic unit tests and hosted PR CI have previously passed in the private project. The first GitHub state publisher was observed. GitHub best-effort scheduled recovery, real independent ChatGPT/Claude scheduler delivery, notification placement, and other providers remain **unverified**. The actual release commit must be re-tested before any new claims.
+- A provider-neutral example of topic state on `main`, issue evidence, checkpoints, focused PRs and approval of the exact revision. This is optional documented practice, not enforced by the digest.
+- A Python GitHub metadata-snapshot publisher, bounded stateless observation windows and example readers (schema 2 default, schema 3 opt-in).
+- Synthetic fixtures, tests, contributor CI, and instructions for private consumer-owned deployments.
 
-## Privacy
+## What must not be claimed
 
-Published activity includes issue titles, actors, SHA metadata, URLs and timestamps, not message bodies. The publisher hashes bodies to detect changes, but this is **not** an anonymization tool. The state branch can reveal metadata about private collaboration if its repository becomes public. Never publish a private deployment solely for community review.
+- That the system prevents an assistant from accidentally disclosing private connector data.
+- That a pass on CI or a configured cron proves scheduled notification delivery or reliable timer recovery.
+- That native Claude, ChatGPT or other vendors' assistants autonomously coordinate, authorize changes or share tasks through this software.
+- That cross-platform usage, token savings, reduced context drift, or operational time savings are measured.
+- That the optional GitHub topic-state layout is required by the digest.
+
+## Release hygiene
+
+Before changing **this existing repository** to public, audit current files, all branches (including past `digest-state` content), reachable Git history, issue/PR comments, and GitHub Actions logs/artifacts. Deleting a branch does not erase historical objects or logs by itself. Stop the public change if private material or credentials remain exposed.
+
+Confirm MIT attribution, contributor/security docs, read-only PR CI, source-only publisher-disabled default, main-branch protections, and the exact commit's tests. Mark the first public tag as a **prerelease**, with a factual verified/unverified matrix. Do not publish private companion implementations or personal records.
+
+An alpha can seek feedback before end-to-end scheduler reliability is proven, but must state that limitation unambiguously.
